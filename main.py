@@ -1,6 +1,6 @@
 import datetime as dt
 from typing import List, Dict
-
+import json
 from fastapi import FastAPI
 import mysql.connector 
 from mysql.connector import Error
@@ -10,6 +10,7 @@ import pandas as pd
 import io
 import requests
 from io import StringIO
+from fastapi.responses import StreamingResponse
 app = FastAPI()
 
 
@@ -119,3 +120,34 @@ def table_init() :
     
     return f'Table with current data fetched\n'
 
+@app.get('/aggregations')
+def find_agg():
+    mydb = mysql.connector.connect(
+        host='mysqldb',
+        user='root',
+        password='p@ssw0rd1',
+        database='fed'
+    )
+    # cursor = mydb.cursor()
+    # cursor.execute('SELECT * FROM fed.fed_data')
+    sql = "SELECT * FROM fed.history_fed_data"
+    dfa = pd.read_sql(sql, con = mydb)
+
+    final_df = pd.DataFrame()
+    #Finindig moving averages for a eight  week window
+    final_df['commercial real estate loans (all comm banks)'] = dfa['H8H8B3219NCBA']
+    final_df['Moving average of commercial real estate loans (all comm banks)'] = dfa['H8H8B3219NCBA'].rolling(8).mean()
+    final_df['Mortgage-backed securities'] = dfa['H8H8B1303NLGA']
+    final_df['Moving average of Mortgage-backed securities'] = dfa['H8H8B1303NLGA'].rolling(8).mean()
+    # finding differences in the Cash assets, all commercial banks, seasonally adjusted	for each week
+    diff = dfa.set_index('Series_Description').diff()['H8H8B1048NCBA'].tolist()
+    final_df['differences of cash assets of all commercial banks'] = diff
+    
+    # result = final_df.to_json(orient='records')
+    # return result
+
+    def iter_df():
+        for _, row in final_df.iterrows():
+            yield json.dumps(row.to_dict()) + '\n'
+
+    return StreamingResponse(iter_df(), media_type="application/json")
