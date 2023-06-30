@@ -18,3 +18,5 @@ To create the current data table and history table localhost:8000/create
 To view the current data  localhost:8000/fed/current_data
 
 To view the history data localhost:8000/fed/history_data
+
+to perform the aggregations localhost:8000/aggregations
